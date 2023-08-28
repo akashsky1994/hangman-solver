@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "hangman"
+version = "0.1.0"
+description = ""
+authors = ["Akash Mishra <akash.mishra13@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+requests = "^2.31.0"
+pandas = "^2.0.3"
+torch = "^2.0.1"
+tqdm = "^4.66.1"
+
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.25.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
