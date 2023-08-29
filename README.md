@@ -41,15 +41,15 @@ tqdm
 
 We use ```hangman_api_user.ipynb``` as our running notebook. Different strategies have been implemented which you can find in the file ```strategy.py```. Default one is currently the bidirectional ngram character model. 
 
-### Intuition behind each strategies:
+## Intuition behind each strategies:
 
 
-#### Information theory - Calculating Entropy (Initial Theory) 
+### Information theory - Calculating Entropy (Initial Theory) 
 Information theory tells us, that the “information” of an event is -log2(p) where p is the probability of the event (the choice of a base 2 log is arbitrary but makes the calculations a bit nicer). This means a more probable event contains more information than a less probable one. Lastly we have entropy which is simply the expected value (or weighted sum) of the information of an event. It tells us the amount of information, on average, that we will receive from a set of events which in our case would be picking any letter. 
 So we aim to calculate entropy for all letters of alphabet for our available dictionary (dictionary after filtered to the current obscured word and length), whichever has the highest entropy is picked as our next guess. 
 Refer to class ```EntropyIT``` in ```strategy.py``` for implementation.
 
-#### Character Ngram Model (Best performing)
+### Character Ngram Model (Best performing)
 Dataset Preparation:
 
 1.	After looking at the dictionary dataset, I found a lot of junk words. I used a simple filtering strategy to remove words which have only 1 set of characters like “aaaaaa”, “zzzz”, …. This reduced my training set from 250,000 to 227,259.
@@ -106,7 +106,8 @@ a.	Average number of vowels
 b.	Average individual probabilities of occurrence of [“a”, “e”, “i”, “o”, “u”]
 
 
-#### LSTM Model Prediction (Additional Strategy Using Deep learning model Model file not available at the time of submission) 
+### LSTM Model Prediction (Additional Strategy Using Deep learning model Model file not available at the time of submission) 
 We use a bidirectional LSTM model to train our hangman solver. We convert each character into an embedding 1x26 where each index indicates a letter of alphabet. Consequently, we get a tensor nx26 for each word where n is the length of word. This input along with the guessed character list is added to model for inference, loss calculated and further optimization. We concatenate the guessed letters to the output of the lstm and pass it to a linear layer which has an outputs of shape nx26. 
 Refer to ```trainer.py``` for implementation. 
 
+I am looking at MLM (Masked Language Model) with Character BERT which might give better results but due to time constraint, I am not able try out that strategy.
