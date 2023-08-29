@@ -6,53 +6,41 @@ class LSTMLetterPredictor(torch.nn.Module):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
-        self.lstm_cells = torch.nn.ModuleList() 
-        
-        for _ in range(num_layers):
-            self.lstm_cells.append(torch.nn.LSTMCell(input_size, hidden_size))
-            input_size = hidden_size
-        # self.dropout = torch.nn.Dropout(dropout)
-        self.fc = torch.nn.Linear(hidden_size + 26, target_size) #because of adding [1x26] size guessed tensor to the output
+        self.lstm = torch.nn.LSTM(input_size=input_size,hidden_size=hidden_size,num_layers=num_layers,dropout=dropout,batch_first=True,bidirectional=True)
+        self.fc = torch.nn.Linear(hidden_size*2 + 26, target_size) #because of adding [1x26] size guessed tensor to the output
 
     def init_state(self, batch_size, device):
-        cx = [torch.zeros((batch_size, self.hidden_size)).to(device)]*self.num_layers
-        hx = [torch.zeros((batch_size, self.hidden_size)).to(device)]*self.num_layers
-        for i in range(self.num_layers):
-            # Weights initialization
-            torch.nn.init.xavier_normal_(hx[i])
-            torch.nn.init.xavier_normal_(cx[i])
+        cx = torch.zeros((batch_size, self.hidden_size)).to(device)
+        hx = torch.zeros((batch_size, self.hidden_size)).to(device)
+        
+        # Weights initialization
+        torch.nn.init.xavier_normal_(hx)
+        torch.nn.init.xavier_normal_(cx)
         return hx,cx
     
 
-    def forward(self,obscured_tensor,guessed_tensor, aggregation_type="last"):
+    def forward(self,obscured_tensor,guessed_tensor, aggregation_type="sum"):
         word_seq_length = obscured_tensor.shape[1]
         batch_size = obscured_tensor.shape[0]
-        hx,cx = self.init_state(batch_size,obscured_tensor.device)
         output_sequence = []
-        obscured_tensor = obscured_tensor.view(word_seq_length,batch_size,-1)
-        
+
+        hx, cx = self.lstm(obscured_tensor)
         for i in range(word_seq_length):
-            out = obscured_tensor[i]
-            for j,lstm_cell in enumerate(self.lstm_cells):
-                hx[j], cx[j] = lstm_cell(out, (hx[j], cx[j]))
-                out = hx[j]
-
-            out = torch.cat([out,guessed_tensor], 1)
-            out = self.fc(out)
-
+            out = torch.cat([hx[:,i,:],guessed_tensor],1)
             output_sequence.append(out)
-        
+
         output_sequence = torch.stack(output_sequence)
 
+        output_sequence = self.fc(output_sequence)
+        output_sequence = output_sequence.view(batch_size, word_seq_length,-1)
+
         if aggregation_type=="sum":
-            output_sequence = torch.sum(output_sequence, dim=0)
+            aggregated_output = torch.sum(output_sequence, dim=1)
         elif aggregation_type=="avg":
-            output_sequence = torch.mean(output_sequence, dim=0)
+            aggregated_output = torch.mean(output_sequence, dim=1)
         elif aggregation_type=="last":
-            output_sequence = output_sequence[-1]
+            aggregated_output = output_sequence[:,-1,:]
         else:
             raise NotImplementedError("Aggregation Type {} not implement".format(aggregation_type))
-
-        
-
-        return output_sequence, torch.sigmoid(output_sequence)
+            
+        return output_sequence,aggregated_output

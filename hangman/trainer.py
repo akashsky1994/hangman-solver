@@ -118,8 +118,8 @@ class Trainer:
         wins = 0
         # obscured_tensor.requires_grad = True # for calculating loss
         while chances_left.sum()>0:
-            out,sigmoid_out = self.model(obscured_tensor,guessed_tensor)
-            guess = torch.argmax(sigmoid_out, dim=1)
+            obscured_tensor,emb_out = self.model(obscured_tensor,guessed_tensor)
+            guess = torch.argmax(emb_out,dim=1)
             
             # Update Guessed Letters
             guess_idx = torch.LongTensor(list(enumerate(guess)))
@@ -128,17 +128,12 @@ class Trainer:
             # update obscured tensor and 
             for i in range(batch_size):
                 if word_tensor[i][guess[i]] and chances_left[i] and not guessed_tensor[i][guess[i]]: # could be infinite loop TODO:
-                    for k,ch in enumerate(word_feature_tensor[i,:,guess[i]]):
-                        if ch:
-                            obscured_tensor[i][k] = sigmoid_out[i]
 
                     if 1 not in obscured_tensor[i,:,26]: # check if any mystery letter left
                         wins += 1
                         chances_left[i]=0
                 else:
                     chances_left[i] = max(chances_left[i]-1,0)
-            
-        # obscured_tensor
         
         loss = self.criterion(obscured_tensor,word_feature_tensor)
         return loss, wins
@@ -177,7 +172,7 @@ class Trainer:
 
             model_weight_path = os.path.join(directory_path, "model_state_dict.pth")
             model_path = os.path.join(directory_path, "model.pth")
-            optimizer_path = os.path.join(directory_path, "{}".format(type(self.optimizer).__name__))
+            optimizer_path = os.path.join(directory_path, "{}.pth".format(str(type(self.optimizer).__name__).lower()))
             
             print('Saving..')
             print("Saved Model - Metrics",metrics)
