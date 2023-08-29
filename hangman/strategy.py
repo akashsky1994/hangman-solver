@@ -3,6 +3,7 @@ import math
 import collections
 import re
 from trainer import Trainer
+from ngram import CharacterNGramBiDirectionalModel
 
 ########################################
 ########## Base Strategy Class ##########
@@ -13,13 +14,13 @@ class BaseStrategy:
         self.current_dictionary = []
         self.ALPHABET = {"a","b","c","d","e","f","g","h","i","j","k","l","m","n","o","p","q","r","s","t","u","v","w","x","y","z"}
 
-    def generate_optimal_choice(self, dictionary):
+    def generate_optimal_choice(self, obscured_word, guessed_letters):
         raise NotImplementedError()
     
     def get_current_dictionary(self,word):
         # clean the word so that we strip away the space characters
         # replace "_" with "." as "." indicates any character in regular expressions
-        clean_word = word.strip().replace(" ","").replace("_",".")
+        clean_word = word[::2].replace("_",".")
         
         # find length of passed word
         len_word = len(clean_word)
@@ -131,6 +132,111 @@ class EntropyIT(BaseStrategy):
                 pattern += "0"
         return pattern
 
+######################################################
+########### Character Ngram Bidirectional  ###########
+######################################################
+class NGramPrediction(BaseStrategy):
+    def __init__(self, full_dictionary):
+        super().__init__(full_dictionary)
+        self.get_current_dictionary()
+        
+        self.build_vowel_probabilities(vowels=["a", "e", "i", "o", "u"])
+        self.models = [
+            CharacterNGramBiDirectionalModel(2, self.current_dictionary),
+            CharacterNGramBiDirectionalModel(3, self.current_dictionary),
+            CharacterNGramBiDirectionalModel(4, self.current_dictionary),
+            CharacterNGramBiDirectionalModel(5, self.current_dictionary),
+            CharacterNGramBiDirectionalModel(6, self.current_dictionary),
+        ]
+        self.weights = [0.05, 0.2, 0.3, 0.3, 0.15]
+
+    def get_current_dictionary(self):
+        self.current_dictionary = [word for word in self.full_dictionary if len(set(word)) != 1]
+        
+    def generate_optimal_choice(self, obscured_word, guessed_letters):
+        clean_word = obscured_word[::2].replace("_",".")
+        
+        # find length of passed word
+        len_word = len(clean_word)
+        
+        if len_word == clean_word.count("."):
+            guess_letter = self.next_vowel_predictor(clean_word, len_word, guessed_letters)
+        else:
+            guess_letter = self.guess_next_ch(clean_word, len_word, guessed_letters)
+            
+        return guess_letter
+
+    def next_vowel_predictor(self, word, key, exclude_list):
+        while True:
+            if key in self.num_vowel_probabilities:
+                num_vowel = self.num_vowel_probabilities[key]
+                break
+            else:
+                key -= 1
+        vowel_probabilities = self.guess_vowel_probabilities[key]
+        vowel_probabilities = sorted(list(vowel_probabilities.items()), key=lambda x: x[1], reverse=True)
+        vowel = None
+        while len(vowel_probabilities):
+            vowel, prob = vowel_probabilities.pop(0)
+            if vowel not in exclude_list:
+                return vowel
+        return vowel
+    
+    def guess_next_ch(self, word, key, exclude_list):
+        next_ch = []
+        for i in range(len(word)):
+            if word[i] != ".":
+                continue
+            prev = word[:i]
+            post = word[i+1:]
+            probabilities = self.calculate_for_contexts(prev, post)
+            while True:
+                ch, prob = probabilities.pop(0)
+                if ch not in exclude_list:
+                    next_ch.append((i, ch, prob))
+                    break
+        next_ch.sort(key=lambda x: x[2], reverse=True)
+        return next_ch[0][1]
+    
+    def calculate_for_contexts(self, prev_context, post_context):
+        return self.combine_probabilities([
+            model.calculate_probability(prev_context, post_context)
+            for model in self.models
+        ])
+    
+    def combine_probabilities(self, probabilities):
+        ch_set = set()
+        num = len(probabilities)
+        for prob in probabilities:
+            ch_set = ch_set.union(prob.keys())
+        final_probablity = []
+        for ch in ch_set:
+            sum_prob_list = max([prob.get(ch, 0.0)*weight for prob, weight in zip(probabilities, self.weights)])
+            final_probablity.append((ch, sum_prob_list))
+        return sorted(final_probablity, key=lambda x: x[1], reverse=True)
+
+    def build_vowel_probabilities(self, vowels):
+        self.guess_vowel_probabilities = {}
+        self.num_vowel_probabilities = {}
+        len_wise_words = {}
+        for word in self.current_dictionary:
+            key = len(word)
+            total_vowel_count = 0
+            current_dict = self.guess_vowel_probabilities.get(key, dict().fromkeys(vowels, 0))
+            current_num_dict = self.num_vowel_probabilities.get(key, [])
+            for ch in vowels:
+                if ch in word:
+                    current_dict[ch] += 1
+                total_vowel_count += word.count(ch)
+            current_num_dict.append(total_vowel_count)    
+            self.guess_vowel_probabilities[key] = current_dict
+            self.num_vowel_probabilities[key] = current_num_dict
+            len_wise_words[key] = len_wise_words.get(key, 0) + 1
+        for key in self.guess_vowel_probabilities:
+            self.num_vowel_probabilities[key] = sum(self.num_vowel_probabilities[key])/len_wise_words[key]
+            for ch in vowels:
+                self.guess_vowel_probabilities[key][ch] = self.guess_vowel_probabilities[key][ch]/len_wise_words[key]
+     
 ########################################
 ########### Model Prediction ###########
 ########################################
@@ -144,11 +250,14 @@ class ModelInference(BaseStrategy):
         return self.model.infer(clean_word, guessed_letters)
 
 
+
 def get_strategy(strategy_mode) -> BaseStrategy:
     if strategy_mode == "most_freq":
         strategy = MostFrequent
     elif strategy_mode == "entropy_it":
         strategy = EntropyIT
+    elif strategy_mode == "ngram":
+        strategy = NGramPrediction
     elif strategy_mode == "lstm":
         strategy = ModelInference
     else:
