@@ -148,7 +148,8 @@ class NGramPrediction(BaseStrategy):
             CharacterNGramBiDirectionalModel(5, self.current_dictionary),
             CharacterNGramBiDirectionalModel(6, self.current_dictionary),
         ]
-        self.weights = [0.05, 0.2, 0.3, 0.3, 0.15]
+        # self.weights = [0.05, 0.2, 0.3, 0.3, 0.15]
+        self.weights = [1, 1, 1, 1, 1]
 
     def get_current_dictionary(self):
         self.current_dictionary = [word for word in self.full_dictionary if len(set(word)) != 1]
