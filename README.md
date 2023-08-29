@@ -106,7 +106,7 @@ a.	Average number of vowels
 b.	Average individual probabilities of occurrence of [“a”, “e”, “i”, “o”, “u”]
 
 
-### LSTM Model Prediction (Additional Strategy Using Deep learning model Model file not available at the time of submission) 
+### Bi-directional LSTM Model Prediction (Additional Strategy Using Deep learning model Model file not available at the time of submission) 
 We use a bidirectional LSTM model to train our hangman solver. We convert each character into an embedding 1x26 where each index indicates a letter of alphabet. Consequently, we get a tensor nx26 for each word where n is the length of word. This input along with the guessed character list is added to model for inference, loss calculated and further optimization. We concatenate the guessed letters to the output of the lstm and pass it to a linear layer which has an outputs of shape nx26. 
 Refer to ```trainer.py``` for implementation. 
 
