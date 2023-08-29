@@ -16,7 +16,7 @@ Torch - if using model inference
 tqdm
 ```
 # Project Structure
-.
+```
 ├── README.md
 ├── checkpoints
 │   ├── model_4.581_0.0
@@ -36,5 +36,5 @@ tqdm
 ├── pyproject.toml
 ├── test.txt
 └── tests
-
+```
 # Running the hangman solver
