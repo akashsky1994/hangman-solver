@@ -2,12 +2,12 @@ import torch
 from torch.autograd import Variable
 
 class LSTMLetterPredictor(torch.nn.Module):
-    def __init__(self, hidden_size = 32, target_size=26, dropout=0.2, num_layers = 2):
+    def __init__(self,input_size = 26, hidden_size = 32, target_size=26, dropout=0.2, num_layers = 2):
         super().__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.lstm_cells = torch.nn.ModuleList() 
-        input_size = 27
+        
         for _ in range(num_layers):
             self.lstm_cells.append(torch.nn.LSTMCell(input_size, hidden_size))
             input_size = hidden_size
@@ -24,7 +24,7 @@ class LSTMLetterPredictor(torch.nn.Module):
         return hx,cx
     
 
-    def forward(self,obscured_tensor,guessed_tensor, aggregation_type="avg"):
+    def forward(self,obscured_tensor,guessed_tensor, aggregation_type="last"):
         word_seq_length = obscured_tensor.shape[1]
         batch_size = obscured_tensor.shape[0]
         hx,cx = self.init_state(batch_size,obscured_tensor.device)
@@ -38,6 +38,8 @@ class LSTMLetterPredictor(torch.nn.Module):
                 out = hx[j]
 
             out = torch.cat([out,guessed_tensor], 1)
+            out = self.fc(out)
+
             output_sequence.append(out)
         
         output_sequence = torch.stack(output_sequence)
@@ -50,8 +52,7 @@ class LSTMLetterPredictor(torch.nn.Module):
             output_sequence = output_sequence[-1]
         else:
             raise NotImplementedError("Aggregation Type {} not implement".format(aggregation_type))
-        #TODO: trying putting linear after the aggregation
 
-        output_sequence = self.fc(output_sequence)
+        
 
         return output_sequence, torch.sigmoid(output_sequence)

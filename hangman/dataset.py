@@ -27,17 +27,18 @@ class DictionaryDataset(torch.utils.data.Dataset):
         return obscured_tensor,word_feature_tensor,word_arr
 
     def collate_fn(self,batch):
-        obscured_tensor = torch.nn.utils.rnn.pad_sequence([torch.tensor(row[0],dtype=torch.float32) for row in batch],batch_first=True,padding_value=26)
-        word_feature_tensor = torch.nn.utils.rnn.pad_sequence([torch.tensor(row[1],dtype=torch.float32) for row in batch],batch_first=True, padding_value=26)
+        obscured_tensor = torch.nn.utils.rnn.pad_sequence([torch.tensor(row[0],dtype=torch.float32) for row in batch],batch_first=True,padding_value=0)
+        word_feature_tensor = torch.nn.utils.rnn.pad_sequence([torch.tensor(row[1],dtype=torch.float32) for row in batch],batch_first=True, padding_value=0)
         word_tensor = torch.stack([torch.tensor(row[2],dtype=torch.float32) for row in batch]) #TODO: list to tensor slow process improve
         return obscured_tensor,word_feature_tensor,word_tensor
 
 
 def encode_word(word):
-    full_word = [26 if i=='_' else ord(i)-97 for i in word]
-    word_tensor = np.zeros((len(word), 27), dtype=np.float32)
+    full_word = [-1 if i=='_' else ord(i)-97 for i in word]
+    word_tensor = np.zeros((len(word), 26), dtype=np.float32)
     for i,j in enumerate(full_word):
-        word_tensor[i,j] = 1
+        if j>=0:
+            word_tensor[i,j] = 1
     return word_tensor
 
 def load_dataset():

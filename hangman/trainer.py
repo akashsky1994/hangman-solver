@@ -63,8 +63,9 @@ class Trainer:
         self.test_loader = DataLoader(test_dataset,batch_size=self.batch_size*self.n_gpus, shuffle=True, num_workers=self.num_workers,collate_fn=collate_fn)
     
     def setup_optimizer_losses(self):
-        # self.criterion = torch.nn.CrossEntropyLoss()
-        self.criterion = torch.nn.BCEWithLogitsLoss()
+        self.criterion = torch.nn.CrossEntropyLoss()
+        # self.criterion = torch.nn.BCEWithLogitsLoss()
+        # self.optimizer = torch.optim.SGD(self.trainableParameters, lr=self.lr,momentum=0.9, weight_decay=5e-4)
         self.optimizer = torch.optim.Adam(self.trainableParameters, lr=self.lr, betas=(0.9,0.999), weight_decay=0.00005)
         self.scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(self.optimizer, T_max=self.EPOCHS, eta_min=1e-4)
       
@@ -115,32 +116,31 @@ class Trainer:
         guessed_tensor = torch.zeros(batch_size,26).to(self.device)
         chances_left = torch.full((batch_size,1), self.total_chances)
         wins = 0
+        # obscured_tensor.requires_grad = True # for calculating loss
         while chances_left.sum()>0:
-            out,sigoid_out = self.model(obscured_tensor,guessed_tensor)
-            guess = torch.argmax(sigoid_out, dim=1)
+            out,sigmoid_out = self.model(obscured_tensor,guessed_tensor)
+            guess = torch.argmax(sigmoid_out, dim=1)
+            
             # Update Guessed Letters
             guess_idx = torch.LongTensor(list(enumerate(guess)))
             guessed_tensor.index_put_(indices=tuple(guess_idx.t()),values=torch.tensor(1,dtype=torch.float32)) # equivalent to : guessed_tensor[guess] = 1
-            
-            # guess = guess.view(-1)
-            # Batch Single Iteration (Not efficient)
+
+            # update obscured tensor and 
             for i in range(batch_size):
-                # guessed_tensor[i][guess[i]] = 1 # Update Guessed Letters
-                
-                if word_tensor[i][guess[i]] and chances_left[i]: 
-                    word_tensor[i][guess[i]] = 0
+                if word_tensor[i][guess[i]] and chances_left[i] and not guessed_tensor[i][guess[i]]: # could be infinite loop TODO:
                     for k,ch in enumerate(word_feature_tensor[i,:,guess[i]]):
                         if ch:
-                            obscured_tensor[i][k] = word_feature_tensor[i][k]#sigoid_out[i] #TODO
+                            obscured_tensor[i][k] = sigmoid_out[i]
 
-                    if 1 not in obscured_tensor[i,:,26]:
+                    if 1 not in obscured_tensor[i,:,26]: # check if any mystery letter left
                         wins += 1
                         chances_left[i]=0
                 else:
                     chances_left[i] = max(chances_left[i]-1,0)
-
+            
+        # obscured_tensor
+        
         loss = self.criterion(obscured_tensor,word_feature_tensor)
-        loss = Variable(loss, requires_grad = True)
         return loss, wins
 
     def evaluate(self,data_loader, evaluation_type="dev"):
